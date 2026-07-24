@@ -1,4 +1,4 @@
-name: Build Online Android APK with Firebase
+name: Build Debug Android APK with Firebase
 
 on:
   push:
@@ -26,8 +26,8 @@ jobs:
       - name: Unzip project files
         run: unzip *.zip -d project_dir
 
-      # 4. بناء وتوقيع ملف الـ Release APK
-      - name: Build and Sign Release APK
+      # 4. بناء نسخة الـ Debug APK واستخراج بصمة SHA-1
+      - name: Build Debug APK & Extract SHA-1
         env:
           _JAVA_OPTIONS: "-Djava.awt.headless=true"
           GRADLE_OPTS: "-Djava.awt.headless=true -Dorg.gradle.jvmargs=-Djava.awt.headless=true"
@@ -42,43 +42,23 @@ jobs:
           echo "🛠️ 1. تجهيز الـ Gradle Wrapper وتصاريح التشغيل..."
           gradle wrapper
           chmod +x gradlew
-          
-          echo "🛠️ 2. إنشاء مفتاح التوقيع my-upload-key.jks..."
-          keytool -genkey -v -keystore my-upload-key.jks \
-            -alias key0 \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass "android" \
-            -keypass "android" \
-            -dname "CN=Online App, OU=Dev, O=App, L=Basra, C=IQ"
 
-          echo "🛠️ 3. كتابة خواص التوقيع في gradle.properties..."
-          echo "MYAPP_RELEASE_STORE_FILE=my-upload-key.jks" >> gradle.properties
-          echo "MYAPP_RELEASE_STORE_PASSWORD=android" >> gradle.properties
-          echo "MYAPP_RELEASE_KEY_ALIAS=key0" >> gradle.properties
-          echo "MYAPP_RELEASE_KEY_PASSWORD=android" >> gradle.properties
-          
-          echo "RELEASE_STORE_FILE=my-upload-key.jks" >> gradle.properties
-          echo "RELEASE_STORE_PASSWORD=android" >> gradle.properties
-          echo "RELEASE_KEY_ALIAS=key0" >> gradle.properties
-          echo "RELEASE_KEY_PASSWORD=android" >> gradle.properties
-          echo "storePassword=android" >> gradle.properties
-          echo "keyPassword=android" >> gradle.properties
-          echo "keyAlias=key0" >> gradle.properties
-          echo "storeFile=my-upload-key.jks" >> gradle.properties
+          echo "🔍 2. التحقق من وجود ملف google-services.json..."
+          if [ ! -f "app/google-services.json" ]; then
+            echo "⚠️ تنبيه: ملف google-services.json غير موجود في app/، يرجى التأكد من تضمينه في ملف الـ ZIP للربط السحابي."
+          fi
 
-          echo "🚀 4. تنفيذ البناء وحقن مفاتيح التوقيع..."
-          ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=$(pwd)/my-upload-key.jks \
-            -Pandroid.injected.signing.store.password=android \
-            -Pandroid.injected.signing.key.alias=key0 \
-            -Pandroid.injected.signing.key.password=android \
-            --no-daemon
+          echo "🚀 3. بناء نسخة الـ Debug..."
+          ./gradlew assembleDebug --no-daemon
 
-          echo "✅ تم البناء والتوقيع بنجاح!"
+          echo "🔑 4. استخراج بصمة SHA-1 الخاصة بنسخة الـ Debug..."
+          ./gradlew signingReport --no-daemon | grep -E "Variant: debug|SHA1:" || true
 
-      # 5. رفع ملف الـ APK النهائي
-      - name: Upload Signed Release APK
+          echo "✅ تم بناء نسخة الـ Debug بنجاح!"
+
+      # 5. رفع ملف الـ Debug APK النهائي
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: DebtTracker-Online-Release-APK
-          path: project_dir/**/build/outputs/apk/release/*.apk
+          name: DebtTracker-Debug-APK
+          path: project_dir/**/build/outputs/apk/debug/*.apk
