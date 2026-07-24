@@ -26,7 +26,7 @@ jobs:
       - name: Unzip project files
         run: unzip *.zip -d project_dir
 
-      # 4. بناء نسخة الـ Debug APK واستخراج بصمة SHA-1
+      # 4. بناء نسخة الـ Debug APK
       - name: Build Debug APK & Extract SHA-1
         env:
           _JAVA_OPTIONS: "-Djava.awt.headless=true"
@@ -43,18 +43,26 @@ jobs:
           gradle wrapper
           chmod +x gradlew
 
-          echo "🔍 2. التحقق من وجود ملف google-services.json..."
+          echo "🔑 2. إنشاء ملف debug.keystore المطلوب للتوقيع..."
+          keytool -genkey -v -keystore debug.keystore \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass "android" \
+            -keypass "android" \
+            -dname "CN=Android Debug, O=Android, C=US"
+
+          echo "🔍 3. التحقق من ملف google-services.json..."
           if [ ! -f "app/google-services.json" ]; then
-            echo "⚠️ تنبيه: ملف google-services.json غير موجود في app/، يرجى التأكد من تضمينه في ملف الـ ZIP للربط السحابي."
+            echo "⚠️ تنبيه: ملف google-services.json غير موجود داخل app/."
           fi
 
-          echo "🚀 3. بناء نسخة الـ Debug..."
+          echo "🚀 4. تنفيذ بناء نسخة الـ Debug..."
           ./gradlew assembleDebug --no-daemon
 
-          echo "🔑 4. استخراج بصمة SHA-1 الخاصة بنسخة الـ Debug..."
+          echo "🔑 5. استخراج بصمة SHA-1..."
           ./gradlew signingReport --no-daemon | grep -E "Variant: debug|SHA1:" || true
 
-          echo "✅ تم بناء نسخة الـ Debug بنجاح!"
+          echo "✅ تم البناء بنجاح!"
 
       # 5. رفع ملف الـ Debug APK النهائي
       - name: Upload Debug APK
